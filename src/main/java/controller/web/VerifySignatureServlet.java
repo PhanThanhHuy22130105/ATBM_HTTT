@@ -54,7 +54,14 @@ public class VerifySignatureServlet extends HttpServlet {
             InputStream fileContent = filePart.getInputStream();
             byte[] signatureBytes = fileContent.readAllBytes();
 
-            // 3. Lấy Public Key từ DB
+            // 3. Lấy Public Key và Kiểm tra trạng thái Khóa từ DB
+            String keyStatus = signatureDAO.getKeyStatusByOrderId(orderId);
+            if ("REVOKED".equals(keyStatus)) {
+                request.setAttribute("error", "Thất bại: Khóa bảo mật của đơn hàng này đã bị báo mất và vô hiệu hóa!");
+                request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
+                return;
+            }
+
             String publicKeyBase64 = signatureDAO.getPublicKeyByOrderId(orderId);
             if (publicKeyBase64 == null) {
                 request.setAttribute("error", "Không tìm thấy khóa công khai cho đơn hàng này!");
@@ -62,10 +69,15 @@ public class VerifySignatureServlet extends HttpServlet {
                 return;
             }
 
-            // 4. Lấy đơn hàng
+            // 4. Lấy đơn hàng và chặn xác thực kép
             Order order = orderDAO.getOrderById(orderId);
             if (order == null) {
                 request.setAttribute("error", "Đơn hàng không tồn tại!");
+                request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
+                return;
+            }
+            if ("VERIFIED".equals(order.getStatus())) {
+                request.setAttribute("error", "Đơn hàng này đã được xác thực thành công từ trước, không thể xác thực lại!");
                 request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
                 return;
             }
