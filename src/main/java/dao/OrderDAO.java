@@ -1,11 +1,12 @@
 package dao;
 
+import models.Order;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import models.Order;
 
 public class OrderDAO {
     private Connection conn;
@@ -45,6 +46,8 @@ public class OrderDAO {
         }
     }
 
+    // ================= CÁC HÀM BỔ SUNG CHO CHỮ KÝ ĐIỆN TỬ =================
+
     // Lấy thông tin đơn hàng theo ID
     public Order getOrderById(int orderId) {
         String sql = "SELECT * FROM `dbo.orders` WHERE id = ?";
@@ -53,11 +56,9 @@ public class OrderDAO {
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 Order order = new Order();
-                // Giả định cột id trong DB tên là id
                 order.setId(rs.getInt("id"));
                 order.setUserId(rs.getInt("user_id"));
-                // Giả định cột tổng tiền trong DB tên là total_price (Dựa vào hàm createOrder của bạn)
-                order.setTotalAmount(rs.getDouble("total_price"));
+                order.setTotalAmount(rs.getDouble("total")); // Đã khớp với DB
                 order.setStatus(rs.getString("status"));
                 return order;
             }
@@ -78,5 +79,4 @@ public class OrderDAO {
             e.printStackTrace();
         }
     }
-
 }

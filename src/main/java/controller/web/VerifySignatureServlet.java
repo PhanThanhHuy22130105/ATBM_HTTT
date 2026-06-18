@@ -47,7 +47,7 @@ public class VerifySignatureServlet extends HttpServlet {
             Part filePart = request.getPart("signatureFile");
             if (filePart == null || filePart.getSize() == 0) {
                 request.setAttribute("error", "Vui lòng chọn file chữ ký!");
-                request.getRequestDispatcher("/error.jsp").forward(request, response);
+                request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
                 return;
             }
 
@@ -58,24 +58,41 @@ public class VerifySignatureServlet extends HttpServlet {
             String publicKeyBase64 = signatureDAO.getPublicKeyByOrderId(orderId);
             if (publicKeyBase64 == null) {
                 request.setAttribute("error", "Không tìm thấy khóa công khai cho đơn hàng này!");
-                request.getRequestDispatcher("/error.jsp").forward(request, response);
+                request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
                 return;
             }
 
-            // 4. Lấy đơn hàng và băm dữ liệu
+            // 4. Lấy đơn hàng
             Order order = orderDAO.getOrderById(orderId);
             if (order == null) {
                 request.setAttribute("error", "Đơn hàng không tồn tại!");
-                request.getRequestDispatcher("/error.jsp").forward(request, response);
+                request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
                 return;
             }
 
-            // LƯU Ý CỰC QUAN TRỌNG: Chuỗi gộp 'currentData' này phải giống HỆT với chuỗi
-            // các bạn đã dùng để tạo file hash ở bước Đặt hàng (File Payment/Checkout).
-            // Tạm thời mình dùng (Tổng tiền + ID người dùng) nhé:
-            String currentData = order.getTotalAmount() + "" + order.getUserId();
+            // ================== TÁI TẠO DỮ LIỆU BĂM KHỚP 100% ==================
+            StringBuilder rawData = new StringBuilder();
+            rawData.append("OrderID:").append(orderId).append("|");
+            rawData.append("UserID:").append(order.getUserId()).append("|");
+            rawData.append("Total:").append(order.getTotalAmount()).append("|");
 
+            // Truy vấn lấy danh sách sản phẩm trong đơn hàng
+            String sql = "SELECT product_id, quantity, price FROM `dbo.order_details` WHERE order_id = ?";
+            try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, orderId);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        rawData.append("Product:").append(rs.getInt("product_id"))
+                                .append("-Qty:").append(rs.getInt("quantity"))
+                                .append("-Price:").append(String.valueOf(rs.getDouble("price"))).append("|");
+                    }
+                }
+            }
+
+            String currentData = rawData.toString();
+            System.out.println("Dữ liệu băm lại lúc Verify: " + currentData);
             String hashData = DigitalSignatureUtil.hashOrderData(currentData);
+            // =================================================================================
 
             // 5. Xác thực
             boolean isValid = DigitalSignatureUtil.verifySignature(hashData, signatureBytes, publicKeyBase64);
@@ -85,17 +102,17 @@ public class VerifySignatureServlet extends HttpServlet {
                 signatureDAO.updateSignature(orderId, signatureBase64);
                 orderDAO.updateOrderStatus(orderId, "VERIFIED");
 
-                response.sendRedirect(request.getContextPath() + "/Success.jsp");
+                response.sendRedirect(request.getContextPath() + "/secure/editProfile.jsp?msg=Xac+thuc+thanh+cong");
             } else {
                 orderDAO.updateOrderStatus(orderId, "FAILED");
-                request.setAttribute("error", "Chữ ký không hợp lệ hoặc dữ liệu đơn hàng đã bị thay đổi trái phép!");
-                request.getRequestDispatcher("/error.jsp").forward(request, response);
+                request.setAttribute("error", "Chữ ký không hợp lệ! Dữ liệu đơn hàng hoặc khóa bảo mật không khớp.");
+                request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
             }
 
         } catch (Exception e) {
             e.printStackTrace();
             request.setAttribute("error", "Đã xảy ra lỗi hệ thống: " + e.getMessage());
-            request.getRequestDispatcher("/error.jsp").forward(request, response);
+            request.getRequestDispatcher("/secure/editProfile.jsp").forward(request, response);
         }
     }
 }
