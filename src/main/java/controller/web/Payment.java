@@ -128,8 +128,11 @@ public class Payment extends HttpServlet {
                     zos.closeEntry();
 
                     // Gói file tool
-                    InputStream toolStream = getServletContext().getResourceAsStream("/tools/DigitalSignerTool.exe");
+                    String exactToolPath = "/tools/DigitalSignerTool.exe/DigitalSignerTool.exe";
+                    InputStream toolStream = getServletContext().getResourceAsStream(exactToolPath);
+
                     if (toolStream != null) {
+                        // Tên file khi giải nén ra sẽ là DigitalSignerTool.exe
                         ZipEntry toolEntry = new ZipEntry("DigitalSignerTool.exe");
                         zos.putNextEntry(toolEntry);
 
@@ -141,10 +144,13 @@ public class Payment extends HttpServlet {
 
                         toolStream.close();
                         zos.closeEntry();
+                        System.out.println("Đã đính kèm thành công Tool Ký vào file ZIP.");
                     } else {
-                        System.out.println("Không tìm thấy file DigitalSignerTool.exe trong thư mục /tools");
+                        System.out.println("Cảnh báo: Không tìm thấy file Tool Ký tại đường dẫn: " + exactToolPath);
                     }
-                }
+                    // ---------------------------------------------------------
+
+                } // Kết thúc khối try (đóng zos tự động)
 
                 session.setAttribute("paymentSuccess", "Thanh toán thành công! Mã đơn: " + orderId + ". Vui lòng kiểm tra file ZIP vừa tải về.");
                 return;

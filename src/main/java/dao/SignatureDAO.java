@@ -130,4 +130,25 @@ public class SignatureDAO {
         }
         return null;
     }
+
+    /**
+     * Lấy trạng thái của khóa (ACTIVE / REVOKED) dựa trên orderId
+     */
+    public String getKeyStatusByOrderId(long orderId) {
+        String sql = "SELECT k.status FROM `dbo.user_keys` k INNER JOIN `dbo.orders_sign` o ON k.id = o.key_id WHERE o.order_id = ?";
+        try (Connection conn = DBConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setLong(1, orderId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return rs.getString("status");
+            }
+        } catch (Exception e) {
+            System.out.println("Lỗi khi kiểm tra trạng thái khóa: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 }
