@@ -55,6 +55,7 @@ public class Payment extends HttpServlet {
         HttpSession session = request.getSession();
         User user = (User) session.getAttribute("user");
         Cart cart = (Cart) session.getAttribute("cart");
+
         if (user == null) {
             response.sendRedirect(request.getContextPath() + "/login?error=Please login to proceed with payment");
             return;
@@ -63,6 +64,7 @@ public class Payment extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/secure/cart?error=Your cart is empty");
             return;
         }
+
         String action = request.getParameter("action");
         System.out.println("doPost called: action = " + action);
 
@@ -78,10 +80,10 @@ public class Payment extends HttpServlet {
             double total = Double.parseDouble(request.getParameter("total"));
 
             try {
-                // 1. Lưu đơn hàng
+                // Lưu đơn hàng
                 long orderId = paymentDAO.saveOrder(user.getId(), total, productIds, quantities, prices);
 
-                // 2. Gom dữ liệu băm
+                // Gom dữ liệu băm
                 StringBuilder rawData = new StringBuilder();
                 rawData.append("OrderID:").append(orderId).append("|");
                 rawData.append("UserID:").append(user.getId()).append("|");
@@ -92,43 +94,43 @@ public class Payment extends HttpServlet {
                             .append("-Price:").append(prices[i]).append("|");
                 }
 
-                // 3. Xử lý thuật toán (Hash, RSA)
+                // Xử lý thuật toán (Hash, RSA)
                 String hashData = DigitalSignatureUtil.hashOrderData(rawData.toString());
                 KeyPair keyPair = DigitalSignatureUtil.generateRSAKeyPair();
                 String publicKeyBase64 = Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
                 String privateKeyBase64 = Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded());
 
-                // 4. Lưu Khóa và Băm xuống DB
+                // Lưu Khóa và Băm xuống DB
                 long keyId = signatureDAO.savePublicKey(user.getId(), publicKeyBase64);
                 signatureDAO.saveOrderSign(orderId, hashData, keyId);
 
-                // 5. Xóa giỏ hàng
+                // Xóa giỏ hàng
                 cart.clearCart();
                 session.setAttribute("cart", cart);
 
-                // 6. Trả file ZIP chứa (Hash, Private Key, và file Tool .jar)
+                // Trả file ZIP chứa (Hash, Private Key, và file Tool .exe)
                 response.setContentType("application/zip");
                 response.setHeader("Content-Disposition", "attachment; filename=\"Order_Signature_Kit_" + orderId + ".zip\"");
 
                 try (OutputStream out = response.getOutputStream();
                      ZipOutputStream zos = new ZipOutputStream(out)) {
 
-                    // Gói file 1: Hash Data
+                    // Gói file Hash Data
                     ZipEntry hashEntry = new ZipEntry("Order_Hash.txt");
                     zos.putNextEntry(hashEntry);
                     zos.write(("Đây là mã băm (Hash) đơn hàng của bạn. Hãy dùng nó trong Tool tạo chữ ký:\n\n" + hashData).getBytes("UTF-8"));
                     zos.closeEntry();
 
-                    // Gói file 2: Private Key
+                    // Gói file Private Key
                     ZipEntry keyEntry = new ZipEntry("Private_Key.txt");
                     zos.putNextEntry(keyEntry);
                     zos.write(("Đây là khóa bảo mật cá nhân (Private Key) của bạn. TUYỆT ĐỐI KHÔNG CHIA SẺ CHO AI!\n\n" + privateKeyBase64).getBytes("UTF-8"));
                     zos.closeEntry();
 
-                    // Gói file 3: Phần mềm Tool (File .jar)
-                    InputStream toolStream = getServletContext().getResourceAsStream("/tool/ToolCK.jar");
+                    // Gói file tool
+                    InputStream toolStream = getServletContext().getResourceAsStream("/tools/DigitalSignerTool.exe");
                     if (toolStream != null) {
-                        ZipEntry toolEntry = new ZipEntry("ToolCK.jar");
+                        ZipEntry toolEntry = new ZipEntry("DigitalSignerTool.exe");
                         zos.putNextEntry(toolEntry);
 
                         byte[] buffer = new byte[4096];
@@ -140,7 +142,7 @@ public class Payment extends HttpServlet {
                         toolStream.close();
                         zos.closeEntry();
                     } else {
-                        System.out.println("LỖI CẢNH BÁO: Không tìm thấy file DigitalSignerTool.jar trong thư mục /tools");
+                        System.out.println("Không tìm thấy file DigitalSignerTool.exe trong thư mục /tools");
                     }
                 }
 
