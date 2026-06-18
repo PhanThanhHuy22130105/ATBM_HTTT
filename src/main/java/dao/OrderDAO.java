@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import models.Order;
 
 public class OrderDAO {
     private Connection conn;
@@ -43,4 +44,39 @@ public class OrderDAO {
             e.printStackTrace();
         }
     }
+
+    // Lấy thông tin đơn hàng theo ID
+    public Order getOrderById(int orderId) {
+        String sql = "SELECT * FROM `dbo.orders` WHERE id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, orderId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                Order order = new Order();
+                // Giả định cột id trong DB tên là id
+                order.setId(rs.getInt("id"));
+                order.setUserId(rs.getInt("user_id"));
+                // Giả định cột tổng tiền trong DB tên là total_price (Dựa vào hàm createOrder của bạn)
+                order.setTotalAmount(rs.getDouble("total_price"));
+                order.setStatus(rs.getString("status"));
+                return order;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Cập nhật trạng thái đơn hàng
+    public void updateOrderStatus(int orderId, String status) {
+        String sql = "UPDATE `dbo.orders` SET status = ? WHERE id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, status);
+            stmt.setInt(2, orderId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
